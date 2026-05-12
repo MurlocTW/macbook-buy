@@ -1,0 +1,52 @@
+name: stock-check
+
+on:
+  schedule:
+    # 每 20 分鐘跑一次 (GitHub Actions 排程不保證準時, 通常 5~15 分鐘延遲)
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stock-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Restore state cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: stock-monitor-state-v1-
+          restore-keys: |
+            stock-monitor-state-v1-
+
+      - name: Run monitor
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python monitor.py
+
+      # actions/cache 在 cache hit 時不會覆寫. 用獨立 save action 確保每次都寫回最新狀態.
+      - name: Save state cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: stock-monitor-state-v1-${{ github.run_id }}-${{ github.run_attempt }}

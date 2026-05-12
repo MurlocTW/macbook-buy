@@ -1,0 +1,54 @@
+# 監控目標清單
+#
+# Apple (apple):
+#   part_number: 必填,Apple 料號(去產品頁 view-source 搜 "partNumber")
+#   location:    郵遞區號,預設 "100"(台北中正)
+#   stores:      選填,限定 storeNumber 陣列,例如 ["R713"](信義 A13)。
+#                留空 = 全台任何一家有現貨就算 in_stock
+#
+# PChome (pchome):
+#   product_id:  必填,商品頁網址裡的 ID,例如 24h.pchome.com.tw/prod/DYAJEP-A900JCMV4
+#                同一規格常有多個 listing(不同賣家/促銷),挑一個關注就好
+#
+# Studio A (studioa):
+#   url:         必填,商品頁網址,例如 https://www.studioa.com.tw/products/mwb3ki
+#                一個 URL 通常已包含兩色 SKU
+#   color:       選填,"太空黑" 或 "銀色",限制只看某一色。留空 = 任一色有貨就算
+#
+# 通用:
+#   baseline_part: 選填,給非 Apple 的 listing 用。指向同款的 Apple part_number,
+#                  monitor 會計算「比 Apple 直營便宜 NT$X」並在通知中顯示。
+
+products:
+  # === Apple 官網 ===
+  - name: "Apple 官網: MBP 14 M5 太空黑 24G/1TB"
+    platform: apple
+    part_number: "MDE34TA/A"
+    note: "目標機型"
+    # stores: ["R713"]   # 想只看信義 A13 解開這行
+
+  - name: "Apple 官網: MBP 14 M5 銀色 24G/1TB"
+    platform: apple
+    part_number: "MDE64TA/A"
+    note: "備用色"
+
+  # === PChome 24h ===
+  # 目前找到最便宜的 listing,賣價約 60,662 (比 Apple 直營低)
+  - name: "PChome: MBP 14 M5 24G/1TB (最低價 listing)"
+    platform: pchome
+    product_id: "DYAJEP-A900JCMV4"
+    baseline_part: "MDE34TA/A"
+    note: "比直營便宜"
+
+  # === Studio A ===
+  - name: "Studio A: MBP 14 M5 24G/1TB 太空黑"
+    platform: studioa
+    url: "https://www.studioa.com.tw/products/mwb3ki"
+    color: "太空黑"
+    baseline_part: "MDE34TA/A"
+
+  - name: "Studio A: MBP 14 M5 24G/1TB 銀色"
+    platform: studioa
+    url: "https://www.studioa.com.tw/products/mwb3ki"
+    color: "銀色"
+    baseline_part: "MDE64TA/A"
