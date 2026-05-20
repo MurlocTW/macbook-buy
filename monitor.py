@@ -18,7 +18,7 @@ for stream in (sys.stdout, sys.stderr):
 import yaml
 
 import notify
-from adapters import apple, pchome, studioa
+from adapters import apple, apple_refurb, pchome, studioa
 
 ROOT = Path(__file__).parent
 PRODUCTS_FILE = ROOT / "products.yaml"
@@ -26,6 +26,9 @@ STATE_FILE = ROOT / "state.json"
 
 # Continuous-error threshold before sending a warning notification.
 ERROR_WARN_THRESHOLD = 3
+
+# State-key prefix for Apple refurb listings (one key per part number seen).
+REFURB_PREFIX = "apple_refurb:"
 
 ADAPTERS = {
     "apple": apple.check,
@@ -70,10 +73,14 @@ def main() -> int:
     products = cfg.get("products") or []
     state = load_state()
 
+    # Refurb items watch a whole category, not one product — handled separately.
+    refurb_items = [p for p in products if p.get("platform") == "apple_refurb"]
+    normal_items = [p for p in products if p.get("platform") != "apple_refurb"]
+
     # Pass 1: run every adapter; collect Apple prices as baselines.
     runs = []  # list of (item, key, result)
     apple_prices: dict[str, int] = {}
-    for item in products:
+    for item in normal_items:
         name = item.get("name") or item.get("part_number") or "?"
         plat = item.get("platform")
         key = product_key(item)
@@ -151,8 +158,69 @@ def main() -> int:
         except Exception as e:
             print(f"[notify-error] {e}")
 
+    # Refurb categories: push on any newly-appeared listing under max_price.
+    for item in refurb_items:
+        _handle_refurb(item, state, new_state)
+
     save_state(new_state)
     return 0
+
+
+def _handle_refurb(item: dict, state: dict, new_state: dict) -> None:
+    """Scan a refurb category. Notify once per newly-listed part within budget.
+
+    State holds one key per part number ever seen (`apple_refurb:<part>`).
+    A part is "new" when its key is absent from the previous state. To avoid
+    spamming every existing listing on the very first run, we only notify once
+    the category has been seeded at least once.
+    """
+    name = item.get("name") or "Apple 整修品"
+    max_price = int(item.get("max_price", 100000))
+
+    try:
+        result = apple_refurb.check(item)
+    except Exception as e:
+        traceback.print_exc()
+        result = {"status": "error", "detail": f"{type(e).__name__}: {e}", "listings": []}
+
+    # On error keep prior refurb state intact — wiping it would re-notify
+    # every listing as "new" once the fetch recovers.
+    if result["status"] == "error":
+        print(f"[error] {name} :: {result['detail']}")
+        for k, v in state.items():
+            if k.startswith(REFURB_PREFIX):
+                new_state[k] = v
+        return
+
+    seeded = any(k.startswith(REFURB_PREFIX) for k in state)
+    listings = result["listings"]
+    print(f"[refurb] {name} :: {result['detail']} (門檻 NT${max_price:,})")
+
+    for listing in listings:
+        key = REFURB_PREFIX + listing["part"]
+        is_new = key not in state
+        price = listing["price"]
+        new_state[key] = {
+            "status": "listed",
+            "title": listing["title"],
+            "price": price,
+            "url": listing["url"],
+        }
+        within = isinstance(price, int) and price <= max_price
+        price_str = f"NT${price:,}" if isinstance(price, int) else "?"
+        mark = "🆕" if is_new else "  "
+        print(f"  {mark} {listing['title']} ({price_str})")
+
+        if is_new and seeded and within:
+            try:
+                notify.send(notify.refurb_message(
+                    listing["title"], item.get("note"), price, listing["url"], max_price,
+                ))
+            except Exception as e:
+                print(f"[notify-error] {e}")
+
+    if not seeded:
+        print(f"[refurb] 首次執行,建立 {len(listings)} 筆 baseline,不發送通知")
 
 
 def _discount_vs_apple(item: dict, price, apple_prices: dict[str, int]) -> int | None:

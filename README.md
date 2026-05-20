@@ -13,6 +13,7 @@
 | Apple 官網(全台 Apple Store 取貨可用性 + 價格) | [adapters/apple.py](adapters/apple.py) | pickup-message API + 商品頁 HTML |
 | PChome 24h(庫存 + 價格) | [adapters/pchome.py](adapters/pchome.py) | ecapi 內部 API(JSONP) |
 | Studio A(分色庫存 + 價格) | [adapters/studioa.py](adapters/studioa.py) | 商品頁 HTML 內嵌的 base64 state blob |
+| Apple 整修品(整個分類「新上架」偵測) | [adapters/apple_refurb.py](adapters/apple_refurb.py) | 分類頁內嵌的 `REFURB_GRID_BOOTSTRAP` JSON |
 | momo | `adapters/momo.py` | ⏳ TODO(計劃用 Playwright,反爬最兇) |
 
 ## 安裝與本地測試
@@ -50,7 +51,7 @@ python monitor.py
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`
 3. 進 Actions 頁手動 run 一次 `stock-check` workflow 確認綠燈
-4. 之後每 20 分鐘自動跑(實際延遲常 5–15 分鐘,免費版限制)
+4. 之後每 30 分鐘自動跑(實際延遲常 5–15 分鐘,免費版限制)
 
 狀態用 `actions/cache` 存,每次 run 寫一個獨立 key、restore 時用前綴模糊配對,讀到的就是最近一次寫入的。
 
@@ -73,6 +74,23 @@ python monitor.py
 - **同價的通路不推**:例如 Studio A 跟 Apple 同價 → 沒折扣 → 不推
 - **缺貨期間有折扣不推**:價格低但拿不到 → 沒意義
 - **折扣消失再恢復會再推一次**:例如漲到跟 Apple 同價後又降回來
+
+## Apple 整修品監控
+
+跟其他通路不同 — 整修品是監控「**整個分類**」而非單一料號(整修品上下架不可預測,無法事先指定 part number)。
+
+只要 MacBook Pro 整修品分類裡出現一筆**從沒見過的料號**,且價格在 `max_price`(預設 NT$100,000)以內,就推播,**不論規格**。
+
+| 上次狀態 | 這次 | 動作 |
+|---------|------|------|
+| 料號從未出現 | 出現且 ≤ max_price | 🆕 推播 |
+| 料號從未出現 | 出現但 > max_price | 不推 |
+| 料號已存在 | 仍在架上 | 不推 |
+| 首次執行 | — | 只建 baseline,全部不推(避免一次洗版) |
+
+下架後又重新上架的料號會被視為「新的」再推一次。整修品分類抓取失敗時保留舊狀態不動,避免恢復後把全部料號當新貨重推。
+
+實作細節:Apple 整修品分類頁會把完整的整修品 Mac 清單 server-render 成 `window.REFURB_GRID_BOOTSTRAP` JSON,React grid 純前端分頁/篩選,沒有額外 API。adapter 直接解析這個 blob,留下 `refurbClearModel == macbookpro` 的 tiles。
 
 ## 換 / 加商品
 
@@ -99,6 +117,7 @@ python monitor.py
 .
 ├── adapters/
 │   ├── apple.py
+│   ├── apple_refurb.py
 │   ├── pchome.py
 │   ├── studioa.py
 │   └── __init__.py

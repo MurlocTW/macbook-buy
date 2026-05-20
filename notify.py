@@ -51,6 +51,26 @@ def restock_message(
     return "\n".join(parts)
 
 
+def refurb_message(
+    title: str,
+    note: str | None,
+    price: int | None,
+    url: str | None,
+    threshold: int | None = None,
+) -> str:
+    parts = ["🆕 <b>整修品上架!</b>", "", html.escape(title)]
+    if isinstance(price, int):
+        line = f"<b>NT${price:,}</b>"
+        if isinstance(threshold, int):
+            line += f"  ✅ <b>在 NT${threshold:,} 門檻內</b>"
+        parts.append(line)
+    if note:
+        parts.append(html.escape(note))
+    if url:
+        parts.append(f"\n👉 {html.escape(url)}")
+    return "\n".join(parts)
+
+
 def warning_message(name: str, detail: str) -> str:
     return (
         f"⚠️ <b>監控警告</b>\n\n"

@@ -2,8 +2,8 @@ name: stock-check
 
 on:
   schedule:
-    # 每 20 分鐘跑一次 (GitHub Actions 排程不保證準時, 通常 5~15 分鐘延遲)
-    - cron: "*/20 * * * *"
+    # 每 30 分鐘跑一次 (GitHub Actions 排程不保證準時, 通常 5~15 分鐘延遲)
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:

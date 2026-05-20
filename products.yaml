@@ -18,8 +18,25 @@
 # 通用:
 #   baseline_part: 選填,給非 Apple 的 listing 用。指向同款的 Apple part_number,
 #                  monitor 會計算「比 Apple 直營便宜 NT$X」並在通知中顯示。
+#
+# Apple 整修品 (apple_refurb):
+#   監控「整個分類」而非單一料號 — 整修品上下架不可預測,無法事先指定 part_number。
+#   category:     選填,分類網址 slug,預設 "macbook-pro"
+#   refurb_model: 選填,refurbClearModel 值,預設 "macbookpro"
+#   max_price:    選填,推播價格門檻 (NT$),預設 100000
+#   行為:只要分類裡「新上架」一筆料號且價格 <= max_price 就推播,不論規格。
+#         首次執行只建 baseline 不推播。
 
 products:
+  # === Apple 整修品 (Refurbished) ===
+  # 監控整個 MacBook Pro 整修品分類,新上架且 <= 10 萬就推播,不論規格。
+  - name: "Apple 整修品: MacBook Pro"
+    platform: apple_refurb
+    category: macbook-pro
+    refurb_model: macbookpro
+    max_price: 100000
+    note: "10 萬內整修品,不論規格"
+
   # === Apple 官網 ===
   - name: "Apple 官網: MBP 14 M5 太空黑 24G/1TB"
     platform: apple
