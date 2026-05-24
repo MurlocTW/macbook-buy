@@ -49,6 +49,16 @@ products:
     part_number: "MDE64TA/A"
     note: "備用色"
 
+  - name: "Apple 官網: MBP 14 M5 太空黑 32G/1TB"
+    platform: apple
+    part_number: "MJ3D4TA/A"
+    note: "進階規格"
+
+  - name: "Apple 官網: MBP 14 M5 銀色 32G/1TB"
+    platform: apple
+    part_number: "MJ3E4TA/A"
+    note: "進階規格"
+
   # === PChome 24h ===
   # 目前找到最便宜的 listing,賣價約 60,662 (比 Apple 直營低)
   - name: "PChome: MBP 14 M5 24G/1TB (最低價 listing)"
