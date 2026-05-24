@@ -57,6 +57,24 @@ python monitor.py
 
 狀態用 `actions/cache` 存,每次 run 寫一個獨立 key、restore 時用前綴模糊配對,讀到的就是最近一次寫入的。
 
+## 通知歷史(debug 用)
+
+每一次 `notify.send()` 都會 append 一行到 `notifications.jsonl`(JSON Lines),含時間戳、狀態、完整訊息文字。檔案上限 500 筆,自動截舊。
+
+| 狀態 | 意義 |
+|------|------|
+| `sent` | Telegram API 200,訊息有送出 |
+| `skipped` | 環境變數 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` 沒設,只印 console 沒實際送 |
+| `error` | 打 Telegram 失敗(含 HTTP error / network),`error` 欄位記下類型 + 訊息 |
+
+```powershell
+python history.py            # 最近 20 筆摘要
+python history.py 50         # 最近 50 筆
+python history.py 5 --full   # 帶完整訊息內容
+```
+
+GitHub Actions 那邊,workflow 用 `actions/cache` 把 `notifications.jsonl` 跟 `state.json` 一起 cache,所以歷史會跨 run 累積。每次 run 結尾也會把最後 10 行 dump 到 run log(`Tail notifications log` step),用 GitHub UI 也看得到。
+
 ## 通知觸發規則
 
 只在「**有貨 且 比 Apple 直營便宜**」的狀態 false → true 翻轉時發訊息(避免洗版)。
@@ -140,9 +158,11 @@ python monitor.py
 │   ├── studioa.py
 │   └── __init__.py
 ├── monitor.py         # 主程式
-├── notify.py          # Telegram
+├── notify.py          # Telegram + 通知歷史 log
+├── history.py         # 印 notifications.jsonl 摘要
 ├── products.yaml      # 商品清單
 ├── state.json         # (執行時產生 / cache 保存)
+├── notifications.jsonl # (執行時產生 / cache 保存,通知歷史)
 ├── requirements.txt
 ├── .github/workflows/check.yml
 └── README.md

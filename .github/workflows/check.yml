@@ -32,9 +32,12 @@ jobs:
         id: cache
         uses: actions/cache/restore@v4
         with:
-          path: state.json
-          key: stock-monitor-state-v1-
+          path: |
+            state.json
+            notifications.jsonl
+          key: stock-monitor-state-v2-
           restore-keys: |
+            stock-monitor-state-v2-
             stock-monitor-state-v1-
 
       - name: Run monitor
@@ -43,10 +46,23 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python monitor.py
 
+      # 把通知歷史的最後幾行直接 dump 到 run log,方便當下查
+      - name: Tail notifications log
+        if: always()
+        run: |
+          if [ -f notifications.jsonl ]; then
+            echo "=== last 10 notifications ==="
+            tail -n 10 notifications.jsonl
+          else
+            echo "(no notifications.jsonl yet)"
+          fi
+
       # actions/cache 在 cache hit 時不會覆寫. 用獨立 save action 確保每次都寫回最新狀態.
       - name: Save state cache
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: state.json
-          key: stock-monitor-state-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            state.json
+            notifications.jsonl
+          key: stock-monitor-state-v2-${{ github.run_id }}-${{ github.run_attempt }}
