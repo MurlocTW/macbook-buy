@@ -26,6 +26,20 @@
 #   max_price:    選填,推播價格門檻 (NT$),預設 100000
 #   行為:只要分類裡「新上架」一筆料號且價格 <= max_price 就推播,不論規格。
 #         首次執行只建 baseline 不推播。
+#
+# PChome 搜尋 (pchome_search):
+#   監控 PChome 搜尋結果頁的「新出現商品 ID」(降價往往以新 listing 形式上架,
+#   盯固定 product_id 抓不到)。會自動翻過所有頁數。
+#   query:         必填,搜尋字串(例:"MacBook Pro M5")
+#   keywords:      必填,過濾用關鍵字列表,標題需「全部」(大小寫不敏感)包含
+#   max_price:     必填,推播價格門檻 (NT$)
+#   baseline_part: 選填,Apple 料號,用來計算「比 Apple 便宜 NT$X」
+#
+# Studio A 搜尋 (studioa_search):
+#   監控 Studio A 分類頁的「新出現商品 slug」(同上,新降價常開新商品頁)。
+#   category:      選填,分類 slug,預設 "macbook-pro"
+#   filter:        選填,?filter= 值(例:"m5" 限定 M5 機型)
+#   keywords / max_price / baseline_part 同 pchome_search
 
 products:
   # === Apple 整修品 (Refurbished) ===
@@ -58,6 +72,25 @@ products:
     platform: apple
     part_number: "MJ3E4TA/A"
     note: "進階規格"
+
+  # === PChome / Studio A 搜尋:抓「新上架」便宜 listing ===
+  # PChome 已驗證一筆 32G/1TB: DYAJEP-A900JSBBJ @ NT$67,522 (比 Apple 直營便宜)
+  - name: "PChome 搜尋: MBP 14 M5 32G/1TB"
+    platform: pchome_search
+    query: "MacBook Pro M5"
+    keywords: ["MacBook", "M5", "32G", "1T"]
+    max_price: 68900
+    baseline_part: "MJ3D4TA/A"
+    note: "新上架且 <= NT$68,900 推播"
+
+  - name: "Studio A 搜尋: MBP 14 M5 32G/1TB"
+    platform: studioa_search
+    category: "macbook-pro"
+    filter: "m5"
+    keywords: ["MacBook", "M5", "32G", "1T"]
+    max_price: 68900
+    baseline_part: "MJ3D4TA/A"
+    note: "新上架且 <= NT$68,900 推播"
 
   # === PChome 24h ===
   # 目前找到最便宜的 listing,賣價約 60,662 (比 Apple 直營低)

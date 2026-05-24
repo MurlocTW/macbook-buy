@@ -14,6 +14,8 @@
 | PChome 24h(庫存 + 價格) | [adapters/pchome.py](adapters/pchome.py) | ecapi 內部 API(JSONP) |
 | Studio A(分色庫存 + 價格) | [adapters/studioa.py](adapters/studioa.py) | 商品頁 HTML 內嵌的 base64 state blob |
 | Apple 整修品(整個分類「新上架」偵測) | [adapters/apple_refurb.py](adapters/apple_refurb.py) | 分類頁內嵌的 `REFURB_GRID_BOOTSTRAP` JSON |
+| PChome 搜尋(全搜尋結果「新上架」偵測) | [adapters/pchome_search.py](adapters/pchome_search.py) | ecshweb 搜尋 API v4.3 (JSON, 全頁迭代) |
+| Studio A 搜尋(整個分類「新上架」偵測) | [adapters/studioa_search.py](adapters/studioa_search.py) | 分類頁 `serverApp-state` 內 `product-shelf-web/web-list` API 快取 |
 | momo | `adapters/momo.py` | ⏳ TODO(計劃用 Playwright,反爬最兇) |
 
 ## 安裝與本地測試
@@ -92,6 +94,19 @@ python monitor.py
 
 實作細節:Apple 整修品分類頁會把完整的整修品 Mac 清單 server-render 成 `window.REFURB_GRID_BOOTSTRAP` JSON,React grid 純前端分頁/篩選,沒有額外 API。adapter 直接解析這個 blob,留下 `refurbClearModel == macbookpro` 的 tiles。
 
+## PChome / Studio A 搜尋監控
+
+跟「Apple 整修品」同一個 pattern,但對的是 PChome 搜尋頁 / Studio A 分類頁。**動機**:這兩個通路發生降價時往往直接開新 listing,盯固定 URL(`pchome` / `studioa` 那兩個 adapter 在做的事)會抓不到。所以另外掃整個搜尋結果,偵測「新出現的商品 ID / slug」。
+
+通用設定:`keywords`(全部需 case-insensitive 包含於標題)、`max_price`(NT$ 門檻)、`baseline_part`(選填,Apple 料號,用來算「比 Apple 便宜 NT$X」)。
+
+| 通路 | 設定 | 訊號來源 |
+|------|------|---------|
+| PChome (`pchome_search`) | `query: "MacBook Pro M5"` | 自動翻完所有頁,符合 keywords 的 listing 都納入 |
+| Studio A (`studioa_search`) | `category: "macbook-pro"` + `filter: "m5"` | 一頁就能讀完目前 15 個 M5 商品的 slug/title/price/stock |
+
+行為跟整修品一致:首次執行只建 baseline、後續新出現的 ID 才推播、抓取失敗保留舊狀態。
+
 ## 換 / 加商品
 
 編 `products.yaml`,參考檔內註解。
@@ -116,9 +131,12 @@ python monitor.py
 ```
 .
 ├── adapters/
+│   ├── _keyword.py
 │   ├── apple.py
 │   ├── apple_refurb.py
 │   ├── pchome.py
+│   ├── pchome_search.py
+│   ├── studioa_search.py
 │   ├── studioa.py
 │   └── __init__.py
 ├── monitor.py         # 主程式

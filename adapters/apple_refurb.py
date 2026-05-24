@@ -13,7 +13,7 @@ How it works:
   `filters.dimensions.refurbClearModel` matches the requested model.
 
 Returns {status, detail, listings} where listings is a list of
-  {part, title, price, url}.
+  {id, title, price, url}.  `id` is the Apple part number (e.g. "G1FSNTA/A").
 """
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def check(item: dict) -> dict:
             continue
         path = tile.get("productDetailsUrl") or ""
         listings.append({
-            "part": part,
+            "id": part,
             "title": (tile.get("title") or "").replace("\xa0", " ").strip(),
             "price": _parse_price(tile),
             "url": ("https://www.apple.com" + path) if path.startswith("/") else path,
