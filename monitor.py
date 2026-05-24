@@ -35,12 +35,15 @@ ADAPTERS = {
 }
 
 # Search/discovery adapters: scan a search or category endpoint and notify on
-# newly-appeared listings matching keywords + within max_price. Each entry maps
-# `platform` -> (check_fn, state_key_prefix, channel_label_for_notification).
+# newly-appeared listings AND on price drops for previously-seen listings.
+# Each entry maps `platform` -> (check_fn, key_prefix, header_new, header_drop).
 SCANS = {
-    "apple_refurb":   (apple_refurb.check,   "apple_refurb:",   "整修品上架!"),
-    "pchome_search":  (pchome_search.check,  "pchome_search:",  "PChome 新上架!"),
-    "studioa_search": (studioa_search.check, "studioa_search:", "Studio A 新上架!"),
+    "apple_refurb":   (apple_refurb.check,   "apple_refurb:",
+                       "整修品上架!",  "整修品降價!"),
+    "pchome_search":  (pchome_search.check,  "pchome_search:",
+                       "PChome 新上架!", "PChome 降價!"),
+    "studioa_search": (studioa_search.check, "studioa_search:",
+                       "Studio A 新上架!", "Studio A 降價!"),
 }
 
 
@@ -164,12 +167,13 @@ def main() -> int:
         except Exception as e:
             print(f"[notify-error] {e}")
 
-    # Search/category scans: push on any newly-appeared listing under max_price.
+    # Search/category scans: push on newly-appeared listings AND on price drops.
     for item in scan_items:
-        scan_fn, key_prefix, header = SCANS[item["platform"]]
+        scan_fn, key_prefix, header_new, header_drop = SCANS[item["platform"]]
         _handle_listing_scan(
             item, state, new_state,
-            scan_fn=scan_fn, key_prefix=key_prefix, header=header,
+            scan_fn=scan_fn, key_prefix=key_prefix,
+            header_new=header_new, header_drop=header_drop,
             apple_prices=apple_prices,
         )
 
@@ -184,15 +188,20 @@ def _handle_listing_scan(
     *,
     scan_fn,
     key_prefix: str,
-    header: str,
+    header_new: str,
+    header_drop: str,
     apple_prices: dict[str, int],
 ) -> None:
     """Generic handler for search/category scan adapters.
 
     Each scan returns {status, detail, listings: [{id, title, price, url, ...}]}.
-    State holds one key per id ever seen (`<key_prefix><id>`); a listing is
-    "new" iff its key is absent from the previous state. First-ever run for a
-    given prefix seeds silently so we don't blast every existing listing.
+    State holds one key per id ever seen (`<key_prefix><id>`); a listing
+    triggers a notification when *either*:
+      - it's brand new (key absent from previous state), OR
+      - it's an existing key whose price dropped below its prior recorded price
+    Both gated on `price <= max_price` and on the prefix having been seeded.
+    First-ever run for a given prefix seeds silently so we don't blast every
+    existing listing.
 
     On adapter error we carry the previous keys forward unchanged — wiping
     them would treat every listing as new once the fetch recovers and spam
@@ -222,8 +231,16 @@ def _handle_listing_scan(
 
     for listing in listings:
         key = key_prefix + listing["id"]
-        is_new = key not in state
+        prev = state.get(key)
+        prev_price = prev.get("price") if isinstance(prev, dict) else None
+        is_new = prev is None
         price = listing["price"]
+        is_drop = (
+            not is_new
+            and isinstance(prev_price, int)
+            and isinstance(price, int)
+            and price < prev_price
+        )
         discount = (baseline_price - price
                     if isinstance(baseline_price, int) and isinstance(price, int)
                     else None)
@@ -235,16 +252,27 @@ def _handle_listing_scan(
         }
         within = isinstance(price, int) and price <= max_price
         price_str = f"NT${price:,}" if isinstance(price, int) else "?"
-        mark = "🆕" if is_new else "  "
-        extra = f" | 比 Apple 便宜 NT${discount:,}" if isinstance(discount, int) and discount > 0 else ""
+        if is_new:
+            mark = "🆕"
+        elif is_drop:
+            mark = "📉"
+        else:
+            mark = "  "
+        extra = ""
+        if is_drop:
+            extra += f" | 從 NT${prev_price:,} ↓"
+        if isinstance(discount, int) and discount > 0:
+            extra += f" | 比 Apple 便宜 NT${discount:,}"
         print(f"  {mark} {listing['title'][:70]} ({price_str}){extra}")
 
-        if is_new and seeded and within:
+        if seeded and within and (is_new or is_drop):
             try:
                 notify.send(notify.listing_message(
-                    header, listing["title"], item.get("note"),
+                    header_drop if is_drop else header_new,
+                    listing["title"], item.get("note"),
                     price, listing["url"], max_price,
                     discount if isinstance(discount, int) and discount > 0 else None,
+                    prev_price if is_drop else None,
                 ))
             except Exception as e:
                 print(f"[notify-error] {e}")

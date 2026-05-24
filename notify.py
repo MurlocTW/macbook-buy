@@ -59,15 +59,30 @@ def listing_message(
     url: str | None,
     threshold: int | None = None,
     discount: int | None = None,
+    prev_price: int | None = None,
 ) -> str:
-    """Generic 🆕 message for newly-appeared listings (refurb / pchome / studioa)."""
-    parts = [f"🆕 <b>{html.escape(header)}</b>", "", html.escape(title)]
+    """🆕 new-listing OR 📉 price-drop message.
+
+    When `prev_price` is provided and higher than `price`, the message is
+    framed as a price drop (📉) with a "↓ 從 NT$old 省 NT$diff" line.
+    Otherwise it's a new-listing message (🆕).
+    """
+    is_drop = (
+        isinstance(prev_price, int)
+        and isinstance(price, int)
+        and prev_price > price
+    )
+    emoji = "📉" if is_drop else "🆕"
+    parts = [f"{emoji} <b>{html.escape(header)}</b>", "", html.escape(title)]
     if isinstance(price, int):
         line = f"<b>NT${price:,}</b>"
+        if is_drop:
+            diff = prev_price - price  # type: ignore[operator]
+            line += f"  ↓ 從 NT${prev_price:,} 省 NT${diff:,}"
         if isinstance(discount, int) and discount > 0:
-            line += f"  💸 <b>比 Apple 便宜 NT${discount:,}</b>"
-        elif isinstance(threshold, int):
-            line += f"  ✅ <b>在 NT${threshold:,} 門檻內</b>"
+            line += f"  💸 比 Apple 便宜 NT${discount:,}"
+        elif not is_drop and isinstance(threshold, int):
+            line += f"  ✅ 在 NT${threshold:,} 門檻內"
         parts.append(line)
     if note:
         parts.append(html.escape(note))
